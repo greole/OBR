@@ -260,6 +260,7 @@ def run(ctx: click.Context, **kwargs):
     "-g", "--generate", is_flag=True, help="Call generate directly after init."
 )
 @click.option("-c", "--config", required=True, help="Path to configuration file.")
+@click.option("-e", "--env", is_flag=True, help="Shows required environment variables and exits.")
 @click.option(
     "-t",
     "--tasks",
@@ -291,6 +292,9 @@ def init(ctx: click.Context, **kwargs):
 
     config_str = read_yaml(kwargs)
     config_str = config_str.replace("\n\n", "\n")
+    if (kwargs.get("env")):
+        sys.exit(0)
+
     config = yaml.safe_load(config_str)
 
     project = OpenFOAMProject.init_project(path=ws_fold)
