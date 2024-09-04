@@ -1,0 +1,85 @@
+case:
+    type: GitRepo
+    url: https://develop.openfoam.com/committees/hpc.git
+    folder: Lid_driven_cavity-3d/S 
+    cache_folder: ${{env.LidDrivenCavityS}}
+    commit: f9594d16aa6993bb3690ec47b2ca624b37ea40cd  
+    uses:
+      - fvSolution: fvSolution.fixedNORM
+    post_build:
+      # NOTE Need to create fvSolution first
+      - controlDict:
+           writeFormat: binary
+           libs: ["libOGL.so"]
+      - fvSolution:
+            set: solvers/p
+            clear: True
+            tolerance: 1e-04
+            relTol: 0
+            maxIter: 5000
+            forceHostBuffer: ${{env.EXASIM_FORCE_HOST_BUFFER}}
+variation:
+  - operation: blockMesh
+    schema: "mesh/{cells}"
+    values:
+      - modifyBlock: "(100 100 100)->(100 100 100)"
+        cells: 100
+        controlDict:
+          deltaT: 0.0005
+          endTime: 0.01
+      - modifyBlock: "(100 100 100)->(200 200 200)"
+        cells: 200
+        controlDict:
+          deltaT: 0.00025
+          endTime: 0.005
+      - modifyBlock: "(100 100 100)->(300 300 300)"
+        cells: 300
+        controlDict:
+          deltaT: 0.000166
+          endTime: 0.0033
+      - modifyBlock: "(100 100 100)->(400 400 400)"
+        cells: 400
+        controlDict:
+          deltaT: 0.000125
+          endTime: 0.0025
+    variation:
+      - operation: decomposePar
+        schema: "decompose/{method}_{partition}_n{numberOfSubdomains}"
+        common:
+            method: simple
+        generator:
+            key: coeff 
+            values: [1, 2, 4]
+            template:
+              - numberOfSubdomains: ${{ coeff * ${{env.NGPUS}} }}
+                partition: GPU
+        variation:
+          ${{include._full_multigrid.yaml}}
+postProcess:
+  queries: ["cells", "numberOfSubmains", "pretype", "ClockTime", "timeStepContErrors_sumLocal"]
+  matcher:
+    - regexp: '\[OGL LOG\]\[Proc: 0\]{field}: {name}: (?P<{name}>[0-9.]*) \[ms\]'
+      name: ogl_matcher
+      args: ["field", "name"]
+  log:
+    - matcher: ogl_matcher
+      args: ["p", "regenerate_distributed_matrix"]
+      type: average
+    - matcher: ogl_matcher
+      args: ["p", "init_precond"]
+      type: average
+    - matcher: ogl_matcher
+      args: ["p", "solve"]
+      type: average
+    - matcher: ogl_matcher
+      args: ["p", "copy_x_back"]
+      type: average
+    - matcher: ogl_matcher
+      args: ["p", "init_precond"]
+      type: average
+    - matcher: ogl_matcher
+      args: ["p", "init_precond"]
+      type: average
+    - matcher: transpEqn
+      args: ["p"]
+      type: average
