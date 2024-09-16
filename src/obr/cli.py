@@ -497,7 +497,10 @@ def postProcess(ctx: click.Context, **kwargs):
             try:
                 matcher_name = l['matcher'] 
                 pass_args = {k:v for k,v in zip(matcher_args[matcher_name], l['args'])}
-                m = matcher[matcher_name](pass_args, matcher_regex[matcher_name])
+                if m_regex := matcher_regex.get(matcher_name):
+                    m = matcher[matcher_name](pass_args, matcher_regex[matcher_name])
+                else:
+                    m = matcher[matcher_name](pass_args)
 
                 log_file_parser = LogFile(log_path, matcher=[m]) 
                 df = convert_to_numbers(log_file_parser.parse_to_df())
