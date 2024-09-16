@@ -456,6 +456,8 @@ def postProcess(ctx: click.Context, **kwargs):
     from Owls.parser.LogFile import LogFile, transportEqn, customMatcher
     from obr.core.core import get_latest_log, get_timestamp_from_log
     from .core.queries import build_filter_query
+    from copy import deepcopy
+    import json
 
     def convert_to_numbers(df):                                        
         """convert all columns to float if they dont have Name in it"""
@@ -471,11 +473,12 @@ def postProcess(ctx: click.Context, **kwargs):
 
     matcher = {"transpEqn": lambda args: transportEqn(**args)}
     matcher_args = {"transpEqn": ["name"]}
+    matcher_regex = {}
 
     for m in d['matcher']:
-        regex = m['regexp']
-        matcher[m['name']] = lambda args: customMatcher(args['name'], regex.format(**args))  
-        matcher_args[m['name']] = m['args']
+        matcher[m['name']] = lambda args, regex: customMatcher(args['name'], regex.format(**args))  
+        matcher_args[m['name']] = deepcopy(m['args'])
+        matcher_regex[m['name']] = deepcopy(m['regexp'])
 
     queries: list[Query] = build_filter_query(d['queries'])
     query_results = project.query(jobs=filtered_jobs, query=queries)
@@ -488,13 +491,13 @@ def postProcess(ctx: click.Context, **kwargs):
             continue
         log_path = Path(job.path)/ "case"/ log
 
-        try:
-            record = query_results[job.id]
-            record['jobid'] = job.id
-            for l in d['log']:
-                matcher_name =l['matcher'] 
-                pass_args = {k:v for k,v in zip(matcher_args[matcher_name],l['args'])}
-                m = matcher[matcher_name](pass_args)
+        record = query_results[job.id]
+        record['jobid'] = job.id
+        for l in d['log']:
+            try:
+                matcher_name = l['matcher'] 
+                pass_args = {k:v for k,v in zip(matcher_args[matcher_name], l['args'])}
+                m = matcher[matcher_name](pass_args, matcher_regex[matcher_name])
 
                 log_file_parser = LogFile(log_path, matcher=[m]) 
                 df = convert_to_numbers(log_file_parser.parse_to_df())
@@ -503,14 +506,13 @@ def postProcess(ctx: click.Context, **kwargs):
                         record[col] = df.iloc[1:][col].mean() 
                     except:
                         pass
-
-
-        except Exception as e:
-            print(e)
+            except Exception as e:
+                print(e)
         if record:
             records.append(record)
     
-    print(records)
+    with open('postpro.json', 'w') as f:
+        json.dump(records, f)
     logger.success("Successfully applied")
 
 
