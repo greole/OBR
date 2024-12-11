@@ -95,7 +95,7 @@ will submit the `blockMesh` operation to the cluster manager for every job that 
 
 ### 4. Postprocessing cases
 
-Since OBR aims at performing parameter studies containing a larger number of individual casses, postprocessing cases manually should be avoided. Its is recommended to use `obr apply` instead.
+Since OBR aims at performing parameter studies containing a larger number of individual cases, postprocessing cases manually should be avoided. Its is recommended to use `obr apply` instead.
 
     obr apply --file script.py --campaign ogl_170
 
